@@ -13,6 +13,10 @@ from backend.routes.profile import (
     router as profile_router,
 )
 
+from backend.routes.files import (
+    router as files_router,
+)
+
 
 app = FastAPI(
     title="AI-Powered Personal Diet Planner API",
@@ -41,7 +45,7 @@ app.add_middleware(
 
 
 # ------------------------------------------------------
-# Health Routes
+# Health
 # ------------------------------------------------------
 
 app.include_router(
@@ -51,7 +55,7 @@ app.include_router(
 
 
 # ------------------------------------------------------
-# Diet Plan Routes
+# Diet Plans
 # ------------------------------------------------------
 
 app.include_router(
@@ -61,11 +65,21 @@ app.include_router(
 
 
 # ------------------------------------------------------
-# Profile Routes
+# User Profile
 # ------------------------------------------------------
 
 app.include_router(
     profile_router,
+    prefix="/api",
+)
+
+
+# ------------------------------------------------------
+# Cloud Files
+# ------------------------------------------------------
+
+app.include_router(
+    files_router,
     prefix="/api",
 )
 
