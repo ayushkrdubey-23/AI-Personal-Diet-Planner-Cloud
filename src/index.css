@@ -1511,3 +1511,431 @@ a {
     margin-left: 0;
   }
 }
+
+/* ================================
+   DASHBOARD PLAN HISTORY
+================================ */
+
+.latest-plan-card {
+  border: 1px solid #e1e8e3;
+  border-radius: 14px;
+  padding: 18px;
+  background: #fbfdfb;
+}
+
+.latest-plan-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  margin-bottom: 9px;
+
+  color: #758093;
+  font-size: 12px;
+}
+
+.latest-plan-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.latest-plan-card h3 {
+  margin: 0 0 17px;
+  font-size: 19px;
+}
+
+.latest-plan-meals {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+}
+
+.latest-plan-meals div {
+  padding: 11px;
+
+  border: 1px solid #e7ebef;
+  border-radius: 10px;
+
+  background: white;
+}
+
+.latest-plan-meals small {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #7c8797;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.latest-plan-meals strong {
+  display: block;
+
+  color: #344052;
+
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.latest-plan-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-top: 17px;
+}
+
+.latest-plan-actions .secondary-action {
+  flex: 1;
+}
+
+.previous-plans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.previous-plan-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 12px;
+
+  border: 1px solid #e5e9ee;
+  border-radius: 11px;
+
+  background: #fbfcfd;
+}
+
+.previous-plan-item > div {
+  flex: 1;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.previous-plan-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 13px;
+}
+
+.previous-plan-item span {
+  color: #687386;
+  font-size: 11px;
+}
+
+.previous-plan-item small {
+  color: #9099a6;
+  font-size: 10px;
+}
+
+.previous-plan-view {
+  width: 34px;
+  height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  border: 1px solid #d9e6dd;
+  border-radius: 9px;
+
+  background: white;
+  color: #287b49;
+}
+
+.previous-plan-view:hover {
+  background: #f1faf4;
+}
+
+@media (max-width: 620px) {
+  .latest-plan-meals {
+    grid-template-columns: 1fr;
+  }
+
+  .latest-plan-actions {
+    flex-wrap: wrap;
+  }
+
+  .latest-plan-actions .secondary-action {
+    width: 100%;
+    flex-basis: 100%;
+  }
+}
+
+/* ================================
+   CLOUD FILES
+================================ */
+
+.storage-info-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+
+  margin-bottom: 18px;
+  padding: 16px;
+
+  border: 1px solid #d8e8de;
+  border-radius: 14px;
+
+  background: #f4faf6;
+}
+
+.storage-info-icon {
+  width: 43px;
+  height: 43px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  border-radius: 11px;
+
+  background: #e1f2e7;
+  color: #27804a;
+}
+
+.storage-info-panel h3 {
+  margin: 0 0 5px;
+
+  color: #285238;
+
+  font-size: 15px;
+}
+
+.storage-info-panel p {
+  max-width: 800px;
+  margin: 0;
+
+  color: #617469;
+
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.file-success-message {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  margin-bottom: 18px;
+  padding: 11px 13px;
+
+  border: 1px solid #cce6d5;
+  border-radius: 10px;
+
+  background: #f1faf4;
+  color: #277545;
+
+  font-size: 13px;
+}
+
+.upload-panel {
+  margin-bottom: 18px;
+}
+
+.upload-dropzone {
+  width: 100%;
+
+  min-height: 190px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  border: 2px dashed #cbded1;
+  border-radius: 15px;
+
+  background: #fbfdfc;
+  color: #354356;
+}
+
+.upload-dropzone:hover {
+  border-color: #85b697;
+  background: #f7fbf8;
+}
+
+.upload-dropzone:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.upload-dropzone-icon {
+  width: 54px;
+  height: 54px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 4px;
+
+  border-radius: 50%;
+
+  background: #e9f7ee;
+  color: #23864b;
+}
+
+.upload-dropzone strong {
+  font-size: 15px;
+}
+
+.upload-dropzone span {
+  color: #7b8697;
+  font-size: 12px;
+}
+
+.file-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 25px;
+  height: 25px;
+
+  margin-left: 4px;
+
+  padding: 0 7px;
+
+  border-radius: 999px;
+
+  background: #e9f7ee;
+  color: #287b49;
+
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.uploaded-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.uploaded-file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 13px;
+
+  border: 1px solid #e3e8ef;
+  border-radius: 12px;
+
+  background: #fbfcfd;
+}
+
+.uploaded-file-icon {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  border-radius: 10px;
+
+  background: #eef4f9;
+  color: #52718a;
+}
+
+.uploaded-file-content {
+  flex: 1;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uploaded-file-content strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  color: #2d3748;
+  font-size: 13px;
+}
+
+.uploaded-file-content span {
+  color: #7d8795;
+  font-size: 11px;
+}
+
+.uploaded-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-action-button {
+  width: 35px;
+  height: 35px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #dce3ea;
+  border-radius: 8px;
+
+  background: white;
+  color: #536073;
+}
+
+.file-action-button:hover {
+  background: #f5f8fa;
+  color: #287b49;
+}
+
+.file-action-button.danger {
+  color: #a25959;
+}
+
+.file-action-button.danger:hover {
+  background: #fff7f7;
+}
+
+@media (max-width: 600px) {
+  .storage-info-panel {
+    align-items: flex-start;
+  }
+
+  .uploaded-file-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .uploaded-file-content {
+    width: calc(100% - 54px);
+  }
+
+  .uploaded-file-actions {
+    width: 100%;
+    margin-left: 54px;
+  }
+
+  .file-action-button {
+    flex: 1;
+  }
+}
