@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   User,
   Target,
@@ -12,14 +13,27 @@ import {
   CircleAlert,
   CalendarDays,
   Trash2,
+  Droplets,
+  Activity,
+  ClipboardCheck,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
+
 import { getUserProfile } from "../services/userService";
+
 import {
   getUserPlans,
   deleteDietPlan,
 } from "../services/planService";
+
+import {
+  getUserTrackers,
+} from "../services/trackerService";
+
+import {
+  getLocalFiles,
+} from "../services/storageService";
 
 function Dashboard() {
   const { currentUser } = useAuth();
@@ -27,6 +41,8 @@ function Dashboard() {
 
   const [profile, setProfile] = useState(null);
   const [plans, setPlans] = useState([]);
+  const [trackers, setTrackers] = useState([]);
+  const [fileCount, setFileCount] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -40,16 +56,32 @@ function Dashboard() {
       try {
         setError("");
 
-        const [userProfile, userPlans] =
-          await Promise.all([
-            getUserProfile(currentUser.uid),
-            getUserPlans(currentUser.uid),
-          ]);
+        const [
+          userProfile,
+          userPlans,
+          userTrackers,
+        ] = await Promise.all([
+          getUserProfile(currentUser.uid),
+          getUserPlans(currentUser.uid),
+          getUserTrackers(currentUser.uid),
+        ]);
 
         setProfile(userProfile);
         setPlans(userPlans);
+        setTrackers(userTrackers);
+
+        // Files are currently stored through the
+        // local object-storage simulation.
+        const localFiles = getLocalFiles(
+          currentUser.uid
+        );
+
+        setFileCount(localFiles.length);
       } catch (err) {
-        console.error("Dashboard loading error:", err);
+        console.error(
+          "Dashboard loading error:",
+          err
+        );
 
         setError(
           "Unable to load your dashboard data."
@@ -80,7 +112,10 @@ function Dashboard() {
         )
       );
     } catch (err) {
-      console.error("Delete plan error:", err);
+      console.error(
+        "Delete plan error:",
+        err
+      );
 
       setError(
         "Unable to delete the selected plan."
@@ -109,14 +144,133 @@ function Dashboard() {
   );
 
   const latestPlan = plans[0];
-  const previousPlans = plans.slice(1, 4);
+
+  const previousPlans = plans.slice(
+    1,
+    4
+  );
+
+  const today = new Date()
+    .toISOString()
+    .split("T")[0];
+
+  const todayTracker = trackers.find(
+    (tracker) =>
+      tracker.date === today
+  );
+
+  const getMealCompletionCount = (
+    tracker
+  ) => {
+    if (!tracker) {
+      return 0;
+    }
+
+    return [
+      tracker.breakfastCompleted,
+      tracker.lunchCompleted,
+      tracker.snackCompleted,
+      tracker.dinnerCompleted,
+    ].filter(Boolean).length;
+  };
+
+  const todayMealCount =
+    getMealCompletionCount(
+      todayTracker
+    );
+
+  const todayMealPercent = Math.round(
+    (todayMealCount / 4) * 100
+  );
+
+  const trackedDays = trackers.length;
+
+  const averageMealCompletion =
+    trackers.length > 0
+      ? Math.round(
+          (trackers.reduce(
+            (sum, tracker) =>
+              sum +
+              getMealCompletionCount(
+                tracker
+              ),
+            0
+          ) /
+            (trackers.length * 4)) *
+            100
+        )
+      : 0;
+
+  const averageWater =
+    trackers.length > 0
+      ? (
+          trackers.reduce(
+            (sum, tracker) =>
+              sum +
+              (Number(
+                tracker.waterServings
+              ) || 0),
+            0
+          ) / trackers.length
+        ).toFixed(1)
+      : "0.0";
+
+  // Last seven calendar days
+  const lastSevenDays =
+    useMemo(() => {
+      const days = [];
+
+      for (let i = 6; i >= 0; i -= 1) {
+        const date = new Date();
+
+        date.setDate(
+          date.getDate() - i
+        );
+
+        const dateString =
+          date
+            .toISOString()
+            .split("T")[0];
+
+        const tracker =
+          trackers.find(
+            (item) =>
+              item.date ===
+              dateString
+          );
+
+        days.push({
+          date: dateString,
+          label: date.toLocaleDateString(
+            undefined,
+            {
+              weekday: "short",
+            }
+          ),
+          percent: tracker
+            ? Math.round(
+                (getMealCompletionCount(
+                  tracker
+                ) /
+                  4) *
+                  100
+              )
+            : 0,
+          tracked: Boolean(tracker),
+        });
+      }
+
+      return days;
+    }, [trackers]);
 
   const formatDate = (dateValue) => {
     if (!dateValue) {
       return "Unknown date";
     }
 
-    return new Date(dateValue).toLocaleDateString();
+    return new Date(
+      dateValue
+    ).toLocaleDateString();
   };
 
   if (loading) {
@@ -125,7 +279,9 @@ function Dashboard() {
         <div className="dashboard-loading">
           <div className="loading-spinner"></div>
 
-          <p>Loading your dashboard...</p>
+          <p>
+            Loading your progress dashboard...
+          </p>
         </div>
       </section>
     );
@@ -137,7 +293,7 @@ function Dashboard() {
       <div className="dashboard-header">
         <div>
           <span className="page-eyebrow">
-            PERSONAL WELLNESS DASHBOARD
+            PROGRESS DASHBOARD
           </span>
 
           <h1>
@@ -145,9 +301,8 @@ function Dashboard() {
           </h1>
 
           <p>
-            Manage your profile, create general wellness
-            meal-plan suggestions, and review your saved
-            plans.
+            Review your saved plans and simple daily
+            wellness activity from one place.
           </p>
         </div>
 
@@ -155,11 +310,11 @@ function Dashboard() {
           type="button"
           className="primary-action"
           onClick={() =>
-            navigate("/generate-plan")
+            navigate("/daily-tracker")
           }
         >
-          <Sparkles size={18} />
-          Generate New Plan
+          <ClipboardCheck size={18} />
+          Open Daily Tracker
         </button>
       </div>
 
@@ -170,7 +325,7 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Overview */}
+      {/* Profile overview */}
       <div className="dashboard-grid">
         <div className="dashboard-card">
           <div className="dashboard-card-icon">
@@ -183,7 +338,8 @@ function Dashboard() {
             </span>
 
             <h3>
-              {profile?.goal || "Not set"}
+              {profile?.goal ||
+                "Not set"}
             </h3>
           </div>
         </div>
@@ -215,9 +371,216 @@ function Dashboard() {
               Saved Plans
             </span>
 
-            <h3>{plans.length}</h3>
+            <h3>
+              {plans.length}
+            </h3>
           </div>
         </div>
+      </div>
+
+      {/* Progress metrics */}
+      <div className="dashboard-grid progress-metrics-grid">
+        <div className="dashboard-card">
+          <div className="dashboard-card-icon">
+            <Activity size={21} />
+          </div>
+
+          <div>
+            <span className="dashboard-card-label">
+              Tracked Days
+            </span>
+
+            <h3>
+              {trackedDays}
+            </h3>
+          </div>
+        </div>
+
+        <div className="dashboard-card">
+          <div className="dashboard-card-icon">
+            <ClipboardCheck size={21} />
+          </div>
+
+          <div>
+            <span className="dashboard-card-label">
+              Average Meal Completion
+            </span>
+
+            <h3>
+              {averageMealCompletion}%
+            </h3>
+          </div>
+        </div>
+
+        <div className="dashboard-card">
+          <div className="dashboard-card-icon">
+            <Droplets size={21} />
+          </div>
+
+          <div>
+            <span className="dashboard-card-label">
+              Avg. Water Servings
+            </span>
+
+            <h3>
+              {averageWater}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Today's progress */}
+      <div className="dashboard-panel today-progress-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="panel-label">
+              TODAY
+            </span>
+
+            <h2>
+              Today's Progress
+            </h2>
+          </div>
+
+          <div className="panel-icon">
+            <Activity size={20} />
+          </div>
+        </div>
+
+        <div className="today-progress-layout">
+          <div className="today-progress-circle">
+            <strong>
+              {todayMealPercent}%
+            </strong>
+
+            <span>
+              meals completed
+            </span>
+          </div>
+
+          <div className="today-progress-details">
+            <div>
+              <span>Breakfast</span>
+
+              <strong>
+                {todayTracker
+                  ?.breakfastCompleted
+                  ? "Completed"
+                  : "Not marked"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Lunch</span>
+
+              <strong>
+                {todayTracker
+                  ?.lunchCompleted
+                  ? "Completed"
+                  : "Not marked"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Snack</span>
+
+              <strong>
+                {todayTracker
+                  ?.snackCompleted
+                  ? "Completed"
+                  : "Not marked"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Dinner</span>
+
+              <strong>
+                {todayTracker
+                  ?.dinnerCompleted
+                  ? "Completed"
+                  : "Not marked"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Water servings</span>
+
+              <strong>
+                {todayTracker
+                  ?.waterServings || 0}
+              </strong>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() =>
+              navigate("/daily-tracker")
+            }
+          >
+            Update Today
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Seven-day activity */}
+      <div className="dashboard-panel weekly-progress-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="panel-label">
+              ACTIVITY HISTORY
+            </span>
+
+            <h2>
+              Last 7 Days
+            </h2>
+          </div>
+
+          <div className="panel-icon">
+            <CalendarDays size={20} />
+          </div>
+        </div>
+
+        <div className="weekly-bars">
+          {lastSevenDays.map(
+            (day) => (
+              <div
+                className="weekly-bar-item"
+                key={day.date}
+              >
+                <div className="weekly-bar-value">
+                  {day.percent}%
+                </div>
+
+                <div className="weekly-bar-track">
+                  <div
+                    style={{
+                      height: `${Math.max(
+                        day.percent,
+                        day.tracked
+                          ? 5
+                          : 0
+                      )}%`,
+                    }}
+                  ></div>
+                </div>
+
+                <span>
+                  {day.label}
+                </span>
+              </div>
+            )
+          )}
+        </div>
+
+        <p className="dashboard-helper-text">
+          Days without a saved tracker are shown as
+          untracked. This is an activity visualization,
+          not a medical progress assessment.
+        </p>
       </div>
 
       {/* Latest + Previous Plans */}
@@ -230,7 +593,9 @@ function Dashboard() {
                 MOST RECENT
               </span>
 
-              <h2>Latest Plan</h2>
+              <h2>
+                Latest Plan
+              </h2>
             </div>
 
             <div className="panel-icon">
@@ -263,34 +628,46 @@ function Dashboard() {
 
               <div className="latest-plan-meals">
                 <div>
-                  <small>Breakfast</small>
+                  <small>
+                    Breakfast
+                  </small>
+
                   <strong>
-                    {latestPlan.breakfast?.title ||
-                      "—"}
+                    {latestPlan.breakfast
+                      ?.title || "—"}
                   </strong>
                 </div>
 
                 <div>
-                  <small>Lunch</small>
+                  <small>
+                    Lunch
+                  </small>
+
                   <strong>
-                    {latestPlan.lunch?.title ||
-                      "—"}
+                    {latestPlan.lunch
+                      ?.title || "—"}
                   </strong>
                 </div>
 
                 <div>
-                  <small>Snack</small>
+                  <small>
+                    Snack
+                  </small>
+
                   <strong>
-                    {latestPlan.snack?.title ||
-                      "—"}
+                    {latestPlan.snack
+                      ?.title || "—"}
                   </strong>
                 </div>
 
                 <div>
-                  <small>Dinner</small>
+                  <small>
+                    Dinner
+                  </small>
+
                   <strong>
-                    {latestPlan.dinner?.title ||
-                      "—"}
+                    {latestPlan.dinner
+                      ?.title || "—"}
                   </strong>
                 </div>
               </div>
@@ -300,7 +677,9 @@ function Dashboard() {
                   type="button"
                   className="secondary-action"
                   onClick={() =>
-                    openPlan(latestPlan)
+                    openPlan(
+                      latestPlan
+                    )
                   }
                 >
                   View Latest Plan
@@ -328,18 +707,22 @@ function Dashboard() {
                 <Sparkles size={25} />
               </div>
 
-              <h3>No plan generated yet</h3>
+              <h3>
+                No plan generated yet
+              </h3>
 
               <p>
-                Create your first general wellness meal-plan
-                suggestion using your saved profile preferences.
+                Create your first general wellness
+                meal-plan suggestion.
               </p>
 
               <button
                 type="button"
                 className="secondary-action"
                 onClick={() =>
-                  navigate("/generate-plan")
+                  navigate(
+                    "/generate-plan"
+                  )
                 }
               >
                 Generate Plan
@@ -357,7 +740,9 @@ function Dashboard() {
                 HISTORY
               </span>
 
-              <h2>Previous Plans</h2>
+              <h2>
+                Previous Plans
+              </h2>
             </div>
 
             <div className="panel-icon">
@@ -367,42 +752,44 @@ function Dashboard() {
 
           {previousPlans.length > 0 ? (
             <div className="previous-plans-list">
-              {previousPlans.map((plan) => (
-                <div
-                  className="previous-plan-item"
-                  key={plan.id}
-                >
-                  <div>
-                    <strong>
-                      {plan.profile?.goal ||
-                        "Balanced Wellness"}
-                    </strong>
-
-                    <span>
-                      {plan.profile
-                        ?.dietaryPreference ||
-                        "Vegetarian"}
-                    </span>
-
-                    <small>
-                      {formatDate(
-                        plan.createdAt
-                      )}
-                    </small>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="previous-plan-view"
-                    onClick={() =>
-                      openPlan(plan)
-                    }
-                    aria-label="View plan"
+              {previousPlans.map(
+                (plan) => (
+                  <div
+                    className="previous-plan-item"
+                    key={plan.id}
                   >
-                    <ArrowRight size={16} />
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <strong>
+                        {plan.profile?.goal ||
+                          "Balanced Wellness"}
+                      </strong>
+
+                      <span>
+                        {plan.profile
+                          ?.dietaryPreference ||
+                          "Vegetarian"}
+                      </span>
+
+                      <small>
+                        {formatDate(
+                          plan.createdAt
+                        )}
+                      </small>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="previous-plan-view"
+                      onClick={() =>
+                        openPlan(plan)
+                      }
+                      aria-label="View plan"
+                    >
+                      <ArrowRight size={16} />
+                    </button>
+                  </div>
+                )
+              )}
             </div>
           ) : (
             <div className="empty-state compact">
@@ -410,18 +797,22 @@ function Dashboard() {
                 <Bookmark size={23} />
               </div>
 
-              <h3>No previous plans</h3>
+              <h3>
+                No previous plans
+              </h3>
 
               <p>
-                After you save more plans, previous
-                plans will appear here.
+                Save additional plans and
+                they'll appear here.
               </p>
 
               <button
                 type="button"
                 className="text-action"
                 onClick={() =>
-                  navigate("/saved-plans")
+                  navigate(
+                    "/saved-plans"
+                  )
                 }
               >
                 Open Saved Plans
@@ -440,7 +831,9 @@ function Dashboard() {
               QUICK ACTIONS
             </span>
 
-            <h2>Manage Your Planner</h2>
+            <h2>
+              Manage Your Planner
+            </h2>
           </div>
         </div>
 
@@ -457,7 +850,9 @@ function Dashboard() {
             </span>
 
             <span className="quick-action-content">
-              <strong>Update Profile</strong>
+              <strong>
+                Update Profile
+              </strong>
 
               <small>
                 Manage your wellness preferences
@@ -471,7 +866,9 @@ function Dashboard() {
             type="button"
             className="quick-action"
             onClick={() =>
-              navigate("/generate-plan")
+              navigate(
+                "/generate-plan"
+              )
             }
           >
             <span className="quick-action-icon">
@@ -479,7 +876,9 @@ function Dashboard() {
             </span>
 
             <span className="quick-action-content">
-              <strong>Generate Plan</strong>
+              <strong>
+                Generate Plan
+              </strong>
 
               <small>
                 Create a new meal-plan suggestion
@@ -493,7 +892,9 @@ function Dashboard() {
             type="button"
             className="quick-action"
             onClick={() =>
-              navigate("/saved-plans")
+              navigate(
+                "/saved-plans"
+              )
             }
           >
             <span className="quick-action-icon">
@@ -501,7 +902,9 @@ function Dashboard() {
             </span>
 
             <span className="quick-action-content">
-              <strong>Saved Plans</strong>
+              <strong>
+                Saved Plans
+              </strong>
 
               <small>
                 View your saved plans
@@ -515,7 +918,9 @@ function Dashboard() {
             type="button"
             className="quick-action"
             onClick={() =>
-              navigate("/cloud-files")
+              navigate(
+                "/cloud-files"
+              )
             }
           >
             <span className="quick-action-icon">
@@ -523,10 +928,15 @@ function Dashboard() {
             </span>
 
             <span className="quick-action-content">
-              <strong>Cloud Files</strong>
+              <strong>
+                Cloud Files
+              </strong>
 
               <small>
-                Manage uploaded demo files
+                {fileCount} file
+                {fileCount === 1
+                  ? ""
+                  : "s"} in storage
               </small>
             </span>
 
@@ -535,7 +945,7 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Profile Status */}
+      {/* Profile status */}
       {!profileComplete && (
         <div className="profile-notice">
           <div className="profile-notice-icon">
@@ -543,7 +953,9 @@ function Dashboard() {
           </div>
 
           <div className="profile-notice-content">
-            <h3>Complete your profile</h3>
+            <h3>
+              Complete your profile
+            </h3>
 
             <p>
               Add your basic profile and food preferences
@@ -573,7 +985,8 @@ function Dashboard() {
             </strong>
 
             <p>
-              You can continue generating and saving plans.
+              Continue tracking activity or generating
+              general wellness plans.
             </p>
           </div>
         </div>

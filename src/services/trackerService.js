@@ -1,6 +1,10 @@
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  query,
+  where,
   setDoc,
 } from "firebase/firestore";
 
@@ -13,7 +17,7 @@ const getTrackerDocumentId = (userId, date) => {
   return `${userId}_${date}`;
 };
 
-// Get today's tracker
+// Get one day's tracker
 export const getDailyTracker = async (
   userId,
   date
@@ -41,7 +45,7 @@ export const getDailyTracker = async (
   };
 };
 
-// Save today's tracker
+// Save one day's tracker
 export const saveDailyTracker = async (
   userId,
   date,
@@ -96,4 +100,40 @@ export const saveDailyTracker = async (
     id: documentId,
     ...data,
   };
+};
+
+// Get all tracker records for one user
+export const getUserTrackers = async (
+  userId
+) => {
+  const trackersRef = collection(
+    db,
+    trackerCollection
+  );
+
+  const trackersQuery = query(
+    trackersRef,
+    where("userId", "==", userId)
+  );
+
+  const snapshot = await getDocs(
+    trackersQuery
+  );
+
+  const trackers = snapshot.docs.map(
+    (item) => ({
+      id: item.id,
+      ...item.data(),
+    })
+  );
+
+  // Sort on the client to avoid needing a
+  // composite Firestore index.
+  trackers.sort((a, b) => {
+    return String(b.date || "").localeCompare(
+      String(a.date || "")
+    );
+  });
+
+  return trackers;
 };
