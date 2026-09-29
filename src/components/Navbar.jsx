@@ -10,6 +10,7 @@ import {
   Cloud,
   LogOut,
   Leaf,
+  Check,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -53,6 +54,11 @@ function Navbar() {
       to: "/saved-plans",
       label: "Saved Plans",
       icon: Bookmark,
+    },
+    {
+       to: "/daily-tracker",
+       label: "Daily Tracker",
+       icon: Check,
     },
     {
       to: "/cloud-files",

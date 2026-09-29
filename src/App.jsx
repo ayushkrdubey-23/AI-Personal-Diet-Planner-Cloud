@@ -13,6 +13,7 @@ import GeneratePlan from "./pages/GeneratePlan";
 import SavedPlans from "./pages/SavedPlans";
 import CloudFiles from "./pages/CloudFiles";
 import PlanResult from "./pages/PlanResult";
+import DailyTracker from "./pages/DailyTracker";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -63,6 +64,11 @@ function App() {
             <Route
               path="/cloud-files"
               element={<CloudFiles />}
+            />
+
+            <Route
+                path="/daily-tracker"
+                element={<DailyTracker />}
             />
 
             <Route
