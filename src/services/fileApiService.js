@@ -1,11 +1,9 @@
 import { getAuth } from "firebase/auth";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://127.0.0.1:8000/api";
 
-/**
- * Get Firebase ID token and prepare authenticated headers.
- */
 async function getAuthHeaders() {
   const auth = getAuth();
   const user = auth.currentUser;
@@ -22,9 +20,6 @@ async function getAuthHeaders() {
   };
 }
 
-/**
- * Handle FastAPI response consistently.
- */
 async function handleResponse(response) {
   let data = null;
 
@@ -35,24 +30,16 @@ async function handleResponse(response) {
   }
 
   if (!response.ok) {
-    const message =
+    throw new Error(
       data?.detail ||
-      data?.message ||
-      `Request failed with status ${response.status}.`;
-
-    throw new Error(message);
+        data?.message ||
+        `Request failed with status ${response.status}.`
+    );
   }
 
   return data;
 }
 
-/**
- * Save file metadata through FastAPI.
- *
- * Important:
- * The actual file content is still stored using the project's
- * local-storage simulation because Firebase Cloud Storage is not being used.
- */
 export async function createFileMetadataWithApi(fileMetadata) {
   const headers = await getAuthHeaders();
 
@@ -65,9 +52,6 @@ export async function createFileMetadataWithApi(fileMetadata) {
   return handleResponse(response);
 }
 
-/**
- * Retrieve authenticated user's file metadata from FastAPI.
- */
 export async function getFilesWithApi() {
   const headers = await getAuthHeaders();
 
@@ -79,9 +63,6 @@ export async function getFilesWithApi() {
   return handleResponse(response);
 }
 
-/**
- * Delete file metadata through FastAPI.
- */
 export async function deleteFileMetadataWithApi(fileId) {
   if (!fileId) {
     throw new Error("File metadata ID is required.");
