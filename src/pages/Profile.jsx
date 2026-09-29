@@ -1,16 +1,29 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Server } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
+
 import {
   createUserProfile,
   getUserProfile,
   updateUserProfile,
 } from "../services/userService";
 
+import {
+  getProfileFromApi,
+  saveProfileToApi,
+} from "../services/profileApiService";
+
+
 function Profile() {
-  const { currentUser, loading: authLoading } = useAuth();
+  const {
+    currentUser,
+    loading: authLoading,
+  } = useAuth();
+
   const navigate = useNavigate();
+
 
   const [form, setForm] = useState({
     name: "",
@@ -24,138 +37,486 @@ function Profile() {
     preferences: "",
   });
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
 
-  // Load profile after Firebase finishes checking authentication
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  const [source, setSource] =
+    useState("FastAPI REST API");
+
+
+  // ------------------------------------------------------
+  // Load profile
+  // ------------------------------------------------------
+
   useEffect(() => {
     if (authLoading) {
       return;
     }
 
-    const loadProfile = async () => {
+
+    const loadProfile =
+      async () => {
+        if (!currentUser) {
+          navigate(
+            "/login",
+            {
+              replace: true,
+            }
+          );
+
+          return;
+        }
+
+
+        setLoading(true);
+        setError("");
+        setMessage("");
+
+
+        try {
+          /*
+           * Primary source:
+           * FastAPI REST API
+           */
+
+          const apiProfile =
+            await getProfileFromApi(
+              currentUser
+            );
+
+
+          if (apiProfile) {
+            setForm({
+              name:
+                apiProfile.name || "",
+
+              age:
+                apiProfile.age || "",
+
+              height:
+                apiProfile.height || "",
+
+              weight:
+                apiProfile.weight || "",
+
+              activity:
+                apiProfile.activity ||
+                "Moderately Active",
+
+              dietaryPreference:
+                apiProfile.dietaryPreference ||
+                "Vegetarian",
+
+              goal:
+                apiProfile.goal ||
+                "Balanced Wellness",
+
+              allergies:
+                apiProfile.allergies || "",
+
+              preferences:
+                apiProfile.preferences || "",
+            });
+
+            setSource(
+              "FastAPI REST API"
+            );
+
+            return;
+          }
+
+
+          /*
+           * No profile exists in API yet.
+           *
+           * Check existing Firestore profile so
+           * previously stored data remains available.
+           */
+
+          try {
+            const firestoreProfile =
+              await getUserProfile(
+                currentUser.uid
+              );
+
+
+            if (firestoreProfile) {
+              setForm({
+                name:
+                  firestoreProfile.name ||
+                  "",
+
+                age:
+                  firestoreProfile.age ||
+                  "",
+
+                height:
+                  firestoreProfile.height ||
+                  "",
+
+                weight:
+                  firestoreProfile.weight ||
+                  "",
+
+                activity:
+                  firestoreProfile.activity ||
+                  "Moderately Active",
+
+                dietaryPreference:
+                  firestoreProfile.dietaryPreference ||
+                  "Vegetarian",
+
+                goal:
+                  firestoreProfile.goal ||
+                  "Balanced Wellness",
+
+                allergies:
+                  firestoreProfile.allergies ||
+                  "",
+
+                preferences:
+                  firestoreProfile.preferences ||
+                  "",
+              });
+
+              setSource(
+                "Firestore fallback"
+              );
+            }
+          } catch (firestoreError) {
+            console.error(
+              "Firestore profile fallback error:",
+              firestoreError
+            );
+          }
+        } catch (apiError) {
+          console.error(
+            "FastAPI profile error:",
+            apiError
+          );
+
+
+          /*
+           * Fallback to existing Firestore service.
+           */
+
+          try {
+            const firestoreProfile =
+              await getUserProfile(
+                currentUser.uid
+              );
+
+
+            if (firestoreProfile) {
+              setForm({
+                name:
+                  firestoreProfile.name ||
+                  "",
+
+                age:
+                  firestoreProfile.age ||
+                  "",
+
+                height:
+                  firestoreProfile.height ||
+                  "",
+
+                weight:
+                  firestoreProfile.weight ||
+                  "",
+
+                activity:
+                  firestoreProfile.activity ||
+                  "Moderately Active",
+
+                dietaryPreference:
+                  firestoreProfile.dietaryPreference ||
+                  "Vegetarian",
+
+                goal:
+                  firestoreProfile.goal ||
+                  "Balanced Wellness",
+
+                allergies:
+                  firestoreProfile.allergies ||
+                  "",
+
+                preferences:
+                  firestoreProfile.preferences ||
+                  "",
+              });
+            }
+
+            setSource(
+              "Firestore fallback"
+            );
+
+            setError(
+              "FastAPI is currently unavailable, so your profile was loaded directly from Firestore."
+            );
+          } catch (firestoreError) {
+            console.error(
+              "Firestore profile error:",
+              firestoreError
+            );
+
+            setError(
+              "Unable to load your profile."
+            );
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
+
+
+    loadProfile();
+  }, [
+    currentUser,
+    authLoading,
+    navigate,
+  ]);
+
+
+  // ------------------------------------------------------
+  // Input changes
+  // ------------------------------------------------------
+
+  const handleChange = (
+    event
+  ) => {
+    const {
+      name,
+      value,
+    } = event.target;
+
+
+    setForm(
+      (previousForm) => ({
+        ...previousForm,
+        [name]: value,
+      })
+    );
+
+
+    if (error) {
+      setError("");
+    }
+
+
+    if (message) {
+      setMessage("");
+    }
+  };
+
+
+  // ------------------------------------------------------
+  // Save profile
+  // ------------------------------------------------------
+
+  const handleSubmit =
+    async (event) => {
+      event.preventDefault();
+
+
       if (!currentUser) {
-        navigate("/login", { replace: true });
+        navigate(
+          "/login",
+          {
+            replace: true,
+          }
+        );
+
         return;
       }
 
+
+      setError("");
+      setMessage("");
+      setSaving(true);
+
+
       try {
-        setError("");
+        /*
+         * Primary source:
+         * FastAPI
+         */
 
-        const profile = await getUserProfile(currentUser.uid);
+        await saveProfileToApi(
+          currentUser,
+          form
+        );
 
-        if (profile) {
-          setForm({
-            name: profile.name || "",
-            age: profile.age || "",
-            height: profile.height || "",
-            weight: profile.weight || "",
-            activity:
-              profile.activity || "Moderately Active",
-            dietaryPreference:
-              profile.dietaryPreference || "Vegetarian",
-            goal:
-              profile.goal || "Balanced Wellness",
-            allergies: profile.allergies || "",
-            preferences: profile.preferences || "",
-          });
+
+        setSource(
+          "FastAPI REST API"
+        );
+
+        setMessage(
+          "Profile saved successfully through FastAPI and Firestore."
+        );
+      } catch (apiError) {
+        console.error(
+          "FastAPI profile save error:",
+          apiError
+        );
+
+
+        /*
+         * Fallback:
+         * Existing Firestore service
+         */
+
+        try {
+          const existingProfile =
+            await getUserProfile(
+              currentUser.uid
+            );
+
+
+          if (existingProfile) {
+            await updateUserProfile(
+              currentUser.uid,
+              form
+            );
+          } else {
+            await createUserProfile(
+              currentUser.uid,
+              form
+            );
+          }
+
+
+          setSource(
+            "Firestore fallback"
+          );
+
+          setMessage(
+            "Profile saved successfully to Firestore."
+          );
+        } catch (firestoreError) {
+          console.error(
+            "Firestore profile save error:",
+            firestoreError
+          );
+
+          setError(
+            "Unable to save your profile. Please try again."
+          );
         }
-      } catch (err) {
-        console.error("Error loading profile:", err);
-        setError("Unable to load your profile.");
       } finally {
-        setLoading(false);
+        setSaving(false);
       }
     };
 
-    loadProfile();
-  }, [currentUser, authLoading, navigate]);
 
-  // Handle input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  // ------------------------------------------------------
+  // Authentication loading
+  // ------------------------------------------------------
 
-    setForm((previousForm) => ({
-      ...previousForm,
-      [name]: value,
-    }));
-  };
-
-  // Save profile to Firestore
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!currentUser) {
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    setError("");
-    setMessage("");
-    setSaving(true);
-
-    try {
-      const existingProfile = await getUserProfile(currentUser.uid);
-
-      if (existingProfile) {
-        await updateUserProfile(currentUser.uid, form);
-      } else {
-        await createUserProfile(currentUser.uid, form);
-      }
-
-      setMessage("Profile saved successfully.");
-    } catch (err) {
-      console.error("Error saving profile:", err);
-      setError("Unable to save your profile. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Wait for Firebase authentication
   if (authLoading) {
     return (
       <div className="auth-page">
         <div className="auth-card">
-          <h2>Checking authentication...</h2>
+          <h2>
+            Checking authentication...
+          </h2>
+
           <p className="auth-subtitle">
-            Please wait while we verify your login session.
+            Please wait while we verify
+            your login session.
           </p>
         </div>
       </div>
     );
   }
 
-  // This is normally handled by ProtectedRoute
+
+  // ------------------------------------------------------
+  // No user
+  // ------------------------------------------------------
+
   if (!currentUser) {
     return null;
   }
 
-  // Wait while Firestore profile is loading
+
+  // ------------------------------------------------------
+  // Profile loading
+  // ------------------------------------------------------
+
   if (loading) {
     return (
       <div className="auth-page">
         <div className="auth-card">
-          <h2>Loading profile...</h2>
+          <h2>
+            Loading profile...
+          </h2>
+
           <p className="auth-subtitle">
-            Please wait while your profile is being loaded.
+            Please wait while your profile
+            is being loaded.
           </p>
         </div>
       </div>
     );
   }
 
+
+  // ------------------------------------------------------
+  // Main UI
+  // ------------------------------------------------------
+
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Your Profile</h1>
+
+        <h1>
+          Your Profile
+        </h1>
 
         <p className="auth-subtitle">
-          Enter your general wellness preferences.
+          Enter your general wellness
+          preferences.
         </p>
 
+
+        {/* API source */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: "10px 12px",
+            marginBottom: "16px",
+            borderRadius: "8px",
+            background: "#eff6ff",
+            color: "#1e40af",
+            fontSize: "13px",
+          }}
+        >
+          <Server size={16} />
+
+          <span>
+            Data source:{" "}
+            <strong>
+              {source}
+            </strong>
+          </span>
+        </div>
+
+
+        {/* Success */}
         {message && (
           <div
             style={{
@@ -170,78 +531,127 @@ function Profile() {
           </div>
         )}
 
+
+        {/* Error */}
         {error && (
           <div className="error-message">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="name">Name</label>
+
+        {/* Form */}
+        <form
+          onSubmit={
+            handleSubmit
+          }
+        >
+
+          {/* Name */}
+          <label htmlFor="name">
+            Name
+          </label>
 
           <input
             id="name"
             type="text"
             name="name"
             value={form.name}
-            onChange={handleChange}
+            onChange={
+              handleChange
+            }
             placeholder="Enter your name"
             required
           />
 
-          <label htmlFor="age">Age</label>
+
+          {/* Age */}
+          <label htmlFor="age">
+            Age
+          </label>
 
           <input
             id="age"
             type="number"
             name="age"
             value={form.age}
-            onChange={handleChange}
+            onChange={
+              handleChange
+            }
             placeholder="Enter age"
             min="1"
             required
           />
 
-          <label htmlFor="height">Height</label>
+
+          {/* Height */}
+          <label htmlFor="height">
+            Height
+          </label>
 
           <input
             id="height"
             type="text"
             name="height"
             value={form.height}
-            onChange={handleChange}
+            onChange={
+              handleChange
+            }
             placeholder="Example: 170 cm"
           />
 
-          <label htmlFor="weight">Weight</label>
+
+          {/* Weight */}
+          <label htmlFor="weight">
+            Weight
+          </label>
 
           <input
             id="weight"
             type="text"
             name="weight"
             value={form.weight}
-            onChange={handleChange}
+            onChange={
+              handleChange
+            }
             placeholder="Example: 60 kg"
           />
 
-          <label htmlFor="activity">Activity Level</label>
+
+          {/* Activity */}
+          <label htmlFor="activity">
+            Activity Level
+          </label>
 
           <select
             id="activity"
             name="activity"
-            value={form.activity}
-            onChange={handleChange}
+            value={
+              form.activity
+            }
+            onChange={
+              handleChange
+            }
           >
-            <option value="Sedentary">Sedentary</option>
+            <option value="Sedentary">
+              Sedentary
+            </option>
+
             <option value="Lightly Active">
               Lightly Active
             </option>
+
             <option value="Moderately Active">
               Moderately Active
             </option>
-            <option value="Very Active">Very Active</option>
+
+            <option value="Very Active">
+              Very Active
+            </option>
           </select>
 
+
+          {/* Dietary preference */}
           <label htmlFor="dietaryPreference">
             Dietary Preference
           </label>
@@ -249,23 +659,39 @@ function Profile() {
           <select
             id="dietaryPreference"
             name="dietaryPreference"
-            value={form.dietaryPreference}
-            onChange={handleChange}
+            value={
+              form.dietaryPreference
+            }
+            onChange={
+              handleChange
+            }
           >
-            <option value="Vegetarian">Vegetarian</option>
-            <option value="Vegan">Vegan</option>
+            <option value="Vegetarian">
+              Vegetarian
+            </option>
+
+            <option value="Vegan">
+              Vegan
+            </option>
+
             <option value="Non-Vegetarian">
               Non-Vegetarian
             </option>
           </select>
 
-          <label htmlFor="goal">Goal</label>
+
+          {/* Goal */}
+          <label htmlFor="goal">
+            Goal
+          </label>
 
           <select
             id="goal"
             name="goal"
             value={form.goal}
-            onChange={handleChange}
+            onChange={
+              handleChange
+            }
           >
             <option value="Balanced Wellness">
               Balanced Wellness
@@ -280,17 +706,27 @@ function Profile() {
             </option>
           </select>
 
-          <label htmlFor="allergies">Allergies</label>
+
+          {/* Allergies */}
+          <label htmlFor="allergies">
+            Allergies
+          </label>
 
           <input
             id="allergies"
             type="text"
             name="allergies"
-            value={form.allergies}
-            onChange={handleChange}
+            value={
+              form.allergies
+            }
+            onChange={
+              handleChange
+            }
             placeholder="Optional"
           />
 
+
+          {/* Preferences */}
           <label htmlFor="preferences">
             Food Preferences
           </label>
@@ -299,19 +735,35 @@ function Profile() {
             id="preferences"
             type="text"
             name="preferences"
-            value={form.preferences}
-            onChange={handleChange}
+            value={
+              form.preferences
+            }
+            onChange={
+              handleChange
+            }
             placeholder="Optional"
           />
 
-          <button type="submit" disabled={saving}>
-            {saving ? "Saving..." : "Save Profile"}
+
+          {/* Save */}
+          <button
+            type="submit"
+            disabled={saving}
+          >
+            {saving
+              ? "Saving..."
+              : "Save Profile"}
           </button>
+
         </form>
 
+
+        {/* Back */}
         <button
           type="button"
-          onClick={() => navigate("/dashboard")}
+          onClick={() =>
+            navigate("/dashboard")
+          }
           style={{
             background: "#6b7280",
             marginTop: "8px",
@@ -320,6 +772,8 @@ function Profile() {
           Back to Dashboard
         </button>
 
+
+        {/* Disclaimer */}
         <p
           style={{
             fontSize: "12px",
@@ -328,13 +782,16 @@ function Profile() {
             lineHeight: "1.5",
           }}
         >
-          This project provides general wellness and
-          educational information. It is not medical or
-          nutritional advice.
+          This project provides general
+          wellness and educational
+          information. It is not medical
+          or nutritional advice.
         </p>
+
       </div>
     </div>
   );
 }
+
 
 export default Profile;

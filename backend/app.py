@@ -1,8 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routes.plans import router as plans_router
 
-from backend.routes.health import router as health_router
+from backend.routes.health import (
+    router as health_router,
+)
+
+from backend.routes.plans import (
+    router as plans_router,
+)
+
+from backend.routes.profile import (
+    router as profile_router,
+)
 
 
 app = FastAPI(
@@ -32,7 +41,7 @@ app.add_middleware(
 
 
 # ------------------------------------------------------
-# Routes
+# Health Routes
 # ------------------------------------------------------
 
 app.include_router(
@@ -40,16 +49,37 @@ app.include_router(
     prefix="/api",
 )
 
+
+# ------------------------------------------------------
+# Diet Plan Routes
+# ------------------------------------------------------
+
 app.include_router(
     plans_router,
     prefix="/api",
 )
 
+
+# ------------------------------------------------------
+# Profile Routes
+# ------------------------------------------------------
+
+app.include_router(
+    profile_router,
+    prefix="/api",
+)
+
+
+# ------------------------------------------------------
+# Root
+# ------------------------------------------------------
+
 @app.get("/")
 async def root():
     return {
-        "message": "AI Personal Diet Planner API is running",
+        "message": (
+            "AI Personal Diet Planner API is running"
+        ),
         "docs": "/docs",
         "health": "/api/health",
     }
-    
