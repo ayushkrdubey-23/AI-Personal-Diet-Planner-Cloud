@@ -2184,3 +2184,36 @@ a {
     height: 135px;
   }
 }
+
+/* ================================
+   PLAN EXPORT
+================================ */
+
+.result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.result-actions .secondary-action {
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .result-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  .result-actions {
+    width: 100%;
+  }
+
+  .result-actions button {
+    flex: 1;
+    min-width: 140px;
+  }
+}

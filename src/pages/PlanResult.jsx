@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Bookmark,
   Check,
+  Download,
   Droplets,
   Leaf,
   Sparkles,
@@ -11,6 +12,10 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 import { saveDietPlan } from "../services/planService";
+import {
+  exportPlanAsJSON,
+  exportPlanAsText,
+} from "../services/exportService";
 
 function PlanResult() {
   const location = useLocation();
@@ -24,6 +29,9 @@ function PlanResult() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
+  // --------------------------------------------------
+  // No plan protection
+  // --------------------------------------------------
   if (!plan) {
     return (
       <section className="page-container">
@@ -46,6 +54,9 @@ function PlanResult() {
     );
   }
 
+  // --------------------------------------------------
+  // Save plan
+  // --------------------------------------------------
   const handleSavePlan = async () => {
     if (!currentUser) {
       navigate("/login");
@@ -61,6 +72,7 @@ function PlanResult() {
       setSaved(true);
     } catch (err) {
       console.error("Save plan error:", err);
+
       setError(
         "Unable to save this plan. Please try again."
       );
@@ -69,9 +81,14 @@ function PlanResult() {
     }
   };
 
+  // --------------------------------------------------
+  // Render meal card
+  // --------------------------------------------------
   const renderMeal = (label, meal) => (
-    <article className="meal-card">
-      <span className="meal-label">{label}</span>
+    <article className="meal-card" key={label}>
+      <span className="meal-label">
+        {label}
+      </span>
 
       <h3>
         {meal?.title || "Meal suggestion"}
@@ -82,18 +99,24 @@ function PlanResult() {
           "A general wellness meal suggestion."}
       </p>
 
-      {meal?.tags?.length > 0 && (
-        <div className="meal-tags">
-          {meal.tags.map((tag) => (
-            <span key={tag}>{tag}</span>
-          ))}
-        </div>
-      )}
+      {Array.isArray(meal?.tags) &&
+        meal.tags.length > 0 && (
+          <div className="meal-tags">
+            {meal.tags.map((tag, index) => (
+              <span key={`${tag}-${index}`}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
     </article>
   );
 
   return (
     <section className="page-container">
+      {/* --------------------------------------------------
+          TOP BAR
+      -------------------------------------------------- */}
       <div className="result-topbar">
         <button
           type="button"
@@ -109,28 +132,53 @@ function PlanResult() {
         </span>
       </div>
 
+      {/* --------------------------------------------------
+          HEADER
+      -------------------------------------------------- */}
       <div className="result-header">
-        <div>
-          <div className="result-title-row">
-            <div className="result-title-icon">
-              <Sparkles size={24} />
-            </div>
+        <div className="result-title-row">
+          <div className="result-title-icon">
+            <Sparkles size={24} />
+          </div>
 
-            <div>
-              <h1>Your Meal Plan</h1>
+          <div>
+            <h1>Your Meal Plan</h1>
 
-              <p>
-                {plan.profile?.goal ||
-                  "Balanced Wellness"}{" "}
-                ·{" "}
-                {plan.profile?.dietaryPreference ||
-                  "Vegetarian"}
-              </p>
-            </div>
+            <p>
+              {plan.profile?.goal ||
+                "Balanced Wellness"}{" "}
+              ·{" "}
+              {plan.profile?.dietaryPreference ||
+                "Vegetarian"}
+            </p>
           </div>
         </div>
 
+        {/* --------------------------------------------------
+            ACTION BUTTONS
+        -------------------------------------------------- */}
         <div className="result-actions">
+          {/* Export TXT */}
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => exportPlanAsText(plan)}
+          >
+            <Download size={17} />
+            Export TXT
+          </button>
+
+          {/* Export JSON */}
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => exportPlanAsJSON(plan)}
+          >
+            <Download size={17} />
+            Export JSON
+          </button>
+
+          {/* Save Plan */}
           <button
             type="button"
             className={
@@ -154,6 +202,7 @@ function PlanResult() {
             )}
           </button>
 
+          {/* Saved Plans */}
           <button
             type="button"
             className="secondary-action"
@@ -165,23 +214,45 @@ function PlanResult() {
         </div>
       </div>
 
+      {/* --------------------------------------------------
+          ERROR MESSAGE
+      -------------------------------------------------- */}
       {error && (
         <div className="dashboard-error">
           <span>{error}</span>
         </div>
       )}
 
+      {/* --------------------------------------------------
+          MEAL GRID
+      -------------------------------------------------- */}
       <div className="meal-grid">
-        {renderMeal("BREAKFAST", plan.breakfast)}
+        {renderMeal(
+          "BREAKFAST",
+          plan.breakfast
+        )}
 
-        {renderMeal("LUNCH", plan.lunch)}
+        {renderMeal(
+          "LUNCH",
+          plan.lunch
+        )}
 
-        {renderMeal("SNACK", plan.snack)}
+        {renderMeal(
+          "SNACK",
+          plan.snack
+        )}
 
-        {renderMeal("DINNER", plan.dinner)}
+        {renderMeal(
+          "DINNER",
+          plan.dinner
+        )}
       </div>
 
+      {/* --------------------------------------------------
+          SUMMARY + HYDRATION
+      -------------------------------------------------- */}
       <div className="result-bottom-grid">
+        {/* Nutrition Summary */}
         <div className="dashboard-panel">
           <div className="panel-heading">
             <div>
@@ -198,25 +269,32 @@ function PlanResult() {
           </div>
 
           <p className="result-summary">
-            {plan.nutritionSummary?.overview}
+            {plan.nutritionSummary?.overview ||
+              "This plan provides general wellness meal suggestions."}
           </p>
 
-          <div className="summary-list">
-            {plan.nutritionSummary?.focus?.map(
-              (item) => (
-                <div
-                  key={item}
-                  className="summary-item"
-                >
-                  <span>✓</span>
+          {Array.isArray(
+            plan.nutritionSummary?.focus
+          ) &&
+            plan.nutritionSummary.focus.length > 0 && (
+              <div className="summary-list">
+                {plan.nutritionSummary.focus.map(
+                  (item, index) => (
+                    <div
+                      key={`${item}-${index}`}
+                      className="summary-item"
+                    >
+                      <span>✓</span>
 
-                  <p>{item}</p>
-                </div>
-              )
+                      <p>{item}</p>
+                    </div>
+                  )
+                )}
+              </div>
             )}
-          </div>
         </div>
 
+        {/* Hydration */}
         <div className="dashboard-panel hydration-panel">
           <div className="panel-heading">
             <div>
@@ -233,13 +311,18 @@ function PlanResult() {
           </div>
 
           <p className="result-summary">
-            {plan.hydrationReminder}
+            {plan.hydrationReminder ||
+              "Stay hydrated throughout the day according to your normal needs."}
           </p>
         </div>
       </div>
 
+      {/* --------------------------------------------------
+          DISCLAIMER
+      -------------------------------------------------- */}
       <div className="result-disclaimer">
-        {plan.disclaimer}
+        {plan.disclaimer ||
+          "This generated plan is for general wellness and educational purposes only and is not medical advice."}
       </div>
     </section>
   );
