@@ -18,6 +18,12 @@ import {
   uploadLocalFile,
 } from "../services/storageService";
 
+import {
+  createFileMetadata,
+  getUserFileMetadata,
+  deleteFileMetadata,
+} from "../services/fileMetadataService";
+
 function CloudFiles() {
   const { currentUser } = useAuth();
 
@@ -25,20 +31,159 @@ function CloudFiles() {
 
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  /*
+   * Load local files and their Firestore metadata.
+   *
+   * Existing local files that were uploaded before this
+   * metadata feature are automatically synced to Firestore
+   * once.
+   */
   useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
+    let isMounted = true;
 
-    const savedFiles = getLocalFiles(
-      currentUser.uid
-    );
+    const loadFiles = async () => {
+      if (!currentUser) {
+        return;
+      }
 
-    setFiles(savedFiles);
+      setLoading(true);
+      setMessage("");
+      setError("");
+
+      try {
+        /*
+         * Step 1:
+         * Get the actual file content from local storage simulation.
+         */
+        const savedFiles = getLocalFiles(
+          currentUser.uid
+        );
+
+        if (isMounted) {
+          setFiles(savedFiles);
+        }
+
+        /*
+         * Step 2:
+         * Get cloud metadata from Firestore.
+         */
+        let metadataFiles = [];
+
+        try {
+          metadataFiles =
+            await getUserFileMetadata(
+              currentUser.uid
+            );
+        } catch (metadataError) {
+          console.error(
+            "Failed to load Firestore file metadata:",
+            metadataError
+          );
+
+          if (isMounted) {
+            setError(
+              "File content loaded, but Firestore metadata could not be loaded."
+            );
+          }
+
+          return;
+        }
+
+        /*
+         * Step 3:
+         * Automatically create metadata for older local files
+         * that do not have a Firestore record yet.
+         */
+        const metadataMap = new Map(
+          metadataFiles.map((item) => [
+            item.localFileId,
+            item,
+          ])
+        );
+
+        const syncedFiles = [];
+
+        for (const file of savedFiles) {
+          const existingMetadata =
+            metadataMap.get(file.id);
+
+          if (existingMetadata) {
+            syncedFiles.push({
+              ...file,
+              metadataId:
+                existingMetadata.id,
+              storagePath:
+                existingMetadata.storagePath,
+              metadataSynced: true,
+            });
+
+            continue;
+          }
+
+          try {
+            const newMetadata =
+              await createFileMetadata(
+                currentUser.uid,
+                file
+              );
+
+            syncedFiles.push({
+              ...file,
+              metadataId: newMetadata.id,
+              storagePath:
+                newMetadata.storagePath,
+              metadataSynced: true,
+            });
+          } catch (syncError) {
+            console.error(
+              "Failed to sync file metadata:",
+              syncError
+            );
+
+            /*
+             * Keep the file visible even if metadata
+             * synchronization fails.
+             */
+            syncedFiles.push({
+              ...file,
+              metadataId: null,
+              storagePath: `local-simulation/${currentUser.uid}/${file.id}`,
+              metadataSynced: false,
+            });
+          }
+        }
+
+        if (isMounted) {
+          setFiles(syncedFiles);
+        }
+      } catch (err) {
+        console.error(
+          "Failed to load files:",
+          err
+        );
+
+        if (isMounted) {
+          setError(
+            "Unable to load your uploaded files."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadFiles();
+
+    return () => {
+      isMounted = false;
+    };
   }, [currentUser]);
 
   const handleChooseFile = () => {
@@ -46,9 +191,12 @@ function CloudFiles() {
   };
 
   const handleFileChange = async (event) => {
-    const selectedFile = event.target.files?.[0];
+    const selectedFile =
+      event.target.files?.[0];
 
-    // Allow the same file to be selected again
+    /*
+     * Allow the same file to be selected again.
+     */
     event.target.value = "";
 
     if (!selectedFile || !currentUser) {
@@ -58,7 +206,9 @@ function CloudFiles() {
     setMessage("");
     setError("");
 
-    // Demo safety limit for browser localStorage
+    /*
+     * Demo safety limit for browser localStorage.
+     */
     const maxSize =
       2 * 1024 * 1024;
 
@@ -88,22 +238,52 @@ function CloudFiles() {
       return;
     }
 
+    let uploadedFile = null;
+
     try {
       setUploading(true);
 
-      const uploadedFile =
+      /*
+       * Step 1:
+       * Store actual file content in local
+       * browser storage simulation.
+       */
+      uploadedFile =
         await uploadLocalFile(
           currentUser.uid,
           selectedFile
         );
 
+      /*
+       * Step 2:
+       * Store metadata in Firestore.
+       */
+      const metadata =
+        await createFileMetadata(
+          currentUser.uid,
+          uploadedFile
+        );
+
+      /*
+       * Step 3:
+       * Merge both storage layers in UI state.
+       */
+      const enrichedFile = {
+        ...uploadedFile,
+        metadataId:
+          metadata.id,
+        storagePath:
+          metadata.storagePath,
+        metadataSynced: true,
+      };
+
       setFiles((previousFiles) => [
-        uploadedFile,
+        enrichedFile,
         ...previousFiles,
       ]);
 
       setMessage(
-        "File uploaded successfully using local storage simulation."
+        "File uploaded successfully. File content is stored locally and metadata is saved in Firestore."
       );
     } catch (err) {
       console.error(
@@ -111,8 +291,30 @@ function CloudFiles() {
         err
       );
 
+      /*
+       * Roll back local file when Firestore metadata
+       * creation fails.
+       */
+      if (
+        uploadedFile &&
+        currentUser
+      ) {
+        try {
+          deleteLocalFile(
+            currentUser.uid,
+            uploadedFile.id
+          );
+        } catch (rollbackError) {
+          console.error(
+            "Local upload rollback failed:",
+            rollbackError
+          );
+        }
+      }
+
       setError(
-        "Unable to upload the selected file."
+        err?.message ||
+          "Unable to upload the selected file."
       );
     } finally {
       setUploading(false);
@@ -120,11 +322,17 @@ function CloudFiles() {
   };
 
   const handleDownload = (file) => {
+    if (!file?.dataUrl) {
+      setError(
+        "This file is not available for download."
+      );
+      return;
+    }
+
     const link =
       document.createElement("a");
 
     link.href = file.dataUrl;
-
     link.download = file.name;
 
     document.body.appendChild(link);
@@ -134,33 +342,51 @@ function CloudFiles() {
     document.body.removeChild(link);
   };
 
-  const handleDelete = (fileId) => {
-    if (!currentUser) {
+  const handleDelete = async (file) => {
+    if (!currentUser || !file) {
       return;
     }
 
     const confirmed = window.confirm(
-      "Delete this file?"
+      `Delete "${file.name}"?`
     );
 
     if (!confirmed) {
       return;
     }
 
+    setMessage("");
+    setError("");
+
     try {
+      /*
+       * Delete Firestore metadata first.
+       */
+      if (file.metadataId) {
+        await deleteFileMetadata(
+          file.metadataId
+        );
+      }
+
+      /*
+       * Delete actual file from local simulation.
+       */
       deleteLocalFile(
         currentUser.uid,
-        fileId
+        file.id
       );
 
+      /*
+       * Remove from UI.
+       */
       setFiles((previousFiles) =>
         previousFiles.filter(
-          (file) => file.id !== fileId
+          (item) => item.id !== file.id
         )
       );
 
       setMessage(
-        "File deleted successfully."
+        "File and its Firestore metadata were deleted successfully."
       );
     } catch (err) {
       console.error(
@@ -169,17 +395,22 @@ function CloudFiles() {
       );
 
       setError(
-        "Unable to delete the selected file."
+        err?.message ||
+          "Unable to delete the selected file."
       );
     }
   };
 
   const getFileIcon = (type) => {
     if (type?.startsWith("image/")) {
-      return <FileImage size={21} />;
+      return (
+        <FileImage size={21} />
+      );
     }
 
-    return <FileText size={21} />;
+    return (
+      <FileText size={21} />
+    );
   };
 
   return (
@@ -205,15 +436,23 @@ function CloudFiles() {
 
         <div>
           <h3>
-            Free local storage simulation
+            Cloud storage simulation
           </h3>
 
           <p>
-            Firebase Authentication and Firestore are
-            running in the cloud. Because Cloud Storage
-            requires billing in the current Firebase
-            setup, uploaded demo file content is stored
-            locally in your browser for this version.
+            Firebase Authentication and Firestore
+            are running in the cloud. Because the
+            current Firebase setup does not use
+            Firebase Cloud Storage, uploaded file
+            content is stored locally in your browser.
+          </p>
+
+          <p className="mt-2">
+            Each uploaded file's metadata is stored
+            in the Firestore{" "}
+            <strong>userFiles</strong> collection
+            with user ID, filename, storage path,
+            upload time, file size, and content type.
           </p>
         </div>
       </div>
@@ -221,14 +460,20 @@ function CloudFiles() {
       {message && (
         <div className="file-success-message">
           <CheckCircle2 size={18} />
-          <span>{message}</span>
+
+          <span>
+            {message}
+          </span>
         </div>
       )}
 
       {error && (
         <div className="dashboard-error">
           <CircleAlert size={18} />
-          <span>{error}</span>
+
+          <span>
+            {error}
+          </span>
         </div>
       )}
 
@@ -240,7 +485,9 @@ function CloudFiles() {
               OBJECT STORAGE DEMO
             </span>
 
-            <h2>Upload a File</h2>
+            <h2>
+              Upload a File
+            </h2>
           </div>
 
           <div className="panel-icon">
@@ -299,17 +546,35 @@ function CloudFiles() {
           </div>
         </div>
 
-        {files.length === 0 ? (
+        {loading ? (
           <div className="empty-state">
             <div className="empty-state-icon">
               <Cloud size={24} />
             </div>
 
-            <h3>No uploaded files</h3>
+            <h3>
+              Loading files...
+            </h3>
 
             <p>
-              Upload a small demo food image, PDF, or
-              text file to test the storage workflow.
+              Loading your local files and
+              Firestore metadata.
+            </p>
+          </div>
+        ) : files.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <Cloud size={24} />
+            </div>
+
+            <h3>
+              No uploaded files
+            </h3>
+
+            <p>
+              Upload a small demo food image,
+              PDF, or text file to test the
+              storage workflow.
             </p>
           </div>
         ) : (
@@ -320,22 +585,30 @@ function CloudFiles() {
                 key={file.id}
               >
                 <div className="uploaded-file-icon">
-                  {getFileIcon(file.type)}
+                  {getFileIcon(
+                    file.type
+                  )}
                 </div>
 
                 <div className="uploaded-file-content">
-                  <strong title={file.name}>
+                  <strong
+                    title={file.name}
+                  >
                     {file.name}
                   </strong>
 
                   <span>
-                    {formatFileSize(file.size)}
+                    {formatFileSize(
+                      file.size
+                    )}
                     {" · "}
                     {new Date(
                       file.uploadedAt
                     ).toLocaleDateString()}
                     {" · "}
-                    Local storage
+                    {file.metadataSynced
+                      ? "Firestore metadata"
+                      : "Metadata pending"}
                   </span>
                 </div>
 
@@ -349,19 +622,23 @@ function CloudFiles() {
                     title="Download"
                     aria-label={`Download ${file.name}`}
                   >
-                    <Download size={17} />
+                    <Download
+                      size={17}
+                    />
                   </button>
 
                   <button
                     type="button"
                     className="file-action-button danger"
                     onClick={() =>
-                      handleDelete(file.id)
+                      handleDelete(file)
                     }
                     title="Delete"
                     aria-label={`Delete ${file.name}`}
                   >
-                    <Trash2 size={17} />
+                    <Trash2
+                      size={17}
+                    />
                   </button>
                 </div>
               </article>
