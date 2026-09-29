@@ -7,20 +7,27 @@ import {
   Target,
   WandSparkles,
   CircleAlert,
+  Server,
+  ShieldCheck,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import { getUserProfile } from "../services/userService";
 import { generateDietPlan } from "../ai_engine/dietEngine";
+import { generatePlanFromAPI } from "../services/apiService";
 
 function GeneratePlan() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+
   const [error, setError] = useState("");
+  const [generationSource, setGenerationSource] =
+    useState("");
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -29,11 +36,19 @@ function GeneratePlan() {
       }
 
       try {
-        const data = await getUserProfile(currentUser.uid);
+        setError("");
+
+        const data = await getUserProfile(
+          currentUser.uid
+        );
+
         setProfile(data);
       } catch (err) {
-        console.error(err);
-        setError("Unable to load your profile.");
+        console.error("Profile loading error:", err);
+
+        setError(
+          "Unable to load your profile."
+        );
       } finally {
         setLoading(false);
       }
@@ -42,17 +57,40 @@ function GeneratePlan() {
     loadProfile();
   }, [currentUser]);
 
-  const handleGenerate = () => {
-    if (!profile) {
+  const handleGenerate = async () => {
+    if (!profile || !currentUser) {
       return;
     }
 
     try {
       setGenerating(true);
       setError("");
+      setGenerationSource("");
 
-      // Version A: local rule-based AI engine
-      const plan = generateDietPlan(profile);
+      let plan;
+
+      try {
+        // Preferred path:
+        // React -> FastAPI -> Backend AI Engine
+        plan = await generatePlanFromAPI(
+          profile,
+          currentUser.uid
+        );
+
+        setGenerationSource("backend");
+      } catch (backendError) {
+        // Required fallback:
+        // If the API is unavailable, use
+        // the local rule-based recommendation engine.
+        console.warn(
+          "Backend unavailable. Using local fallback.",
+          backendError
+        );
+
+        plan = generateDietPlan(profile);
+
+        setGenerationSource("local-fallback");
+      }
 
       navigate("/plan-result", {
         state: {
@@ -60,8 +98,14 @@ function GeneratePlan() {
         },
       });
     } catch (err) {
-      console.error("Plan generation error:", err);
-      setError("Unable to generate a plan.");
+      console.error(
+        "Plan generation error:",
+        err
+      );
+
+      setError(
+        "Unable to generate a meal plan."
+      );
     } finally {
       setGenerating(false);
     }
@@ -72,8 +116,10 @@ function GeneratePlan() {
       <section className="page-container">
         <div className="feature-placeholder">
           <h2>Loading profile...</h2>
+
           <p>
-            Please wait while your profile preferences are loaded.
+            Please wait while your profile preferences
+            are loaded.
           </p>
         </div>
       </section>
@@ -91,14 +137,16 @@ function GeneratePlan() {
           <h2>Complete your profile first</h2>
 
           <p>
-            Add your basic profile and dietary preferences before
-            generating a meal-plan suggestion.
+            Add your basic profile and dietary
+            preferences before generating a plan.
           </p>
 
           <button
             type="button"
             className="secondary-action"
-            onClick={() => navigate("/profile")}
+            onClick={() =>
+              navigate("/profile")
+            }
           >
             Go to Profile
           </button>
@@ -111,14 +159,16 @@ function GeneratePlan() {
     <section className="page-container">
       <div className="page-header">
         <span className="page-eyebrow">
-          VERSION A · RULE-BASED AI
+          AI PLANNER · REST API
         </span>
 
         <h1>Generate Diet Plan</h1>
 
         <p>
-          Create a general wellness meal-plan suggestion from
-          your saved preferences.
+          Your saved profile preferences are sent to
+          the FastAPI recommendation service. A local
+          rule-based engine remains available as a
+          fallback.
         </p>
       </div>
 
@@ -126,6 +176,41 @@ function GeneratePlan() {
         <div className="dashboard-error">
           <CircleAlert size={18} />
           <span>{error}</span>
+        </div>
+      )}
+
+      {generationSource === "backend" && (
+        <div className="generation-success">
+          <Server size={18} />
+
+          <div>
+            <strong>
+              Generated through FastAPI
+            </strong>
+
+            <span>
+              React successfully received the plan
+              from the backend AI engine.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {generationSource === "local-fallback" && (
+        <div className="generation-fallback">
+          <ShieldCheck size={18} />
+
+          <div>
+            <strong>
+              Local fallback was used
+            </strong>
+
+            <span>
+              The backend was unavailable, so the
+              local rule-based recommendation engine
+              generated the plan.
+            </span>
+          </div>
         </div>
       )}
 
@@ -153,7 +238,8 @@ function GeneratePlan() {
               </span>
 
               <strong>
-                {profile.dietaryPreference || "Not set"}
+                {profile.dietaryPreference ||
+                  "Not set"}
               </strong>
             </div>
 
@@ -164,7 +250,8 @@ function GeneratePlan() {
               </span>
 
               <strong>
-                {profile.goal || "Not set"}
+                {profile.goal ||
+                  "Not set"}
               </strong>
             </div>
 
@@ -175,7 +262,8 @@ function GeneratePlan() {
               </span>
 
               <strong>
-                {profile.activity || "Not set"}
+                {profile.activity ||
+                  "Not set"}
               </strong>
             </div>
 
@@ -186,7 +274,8 @@ function GeneratePlan() {
               </span>
 
               <strong>
-                {profile.preferences || "No extra preference"}
+                {profile.preferences ||
+                  "No extra preference"}
               </strong>
             </div>
           </div>
@@ -195,10 +284,10 @@ function GeneratePlan() {
             <CircleAlert size={17} />
 
             <p>
-              This feature demonstrates a rule-based recommendation
-              engine for educational purposes. It does not diagnose
-              health conditions or provide medical or nutritional
-              advice.
+              This feature demonstrates a recommendation
+              engine for educational/general wellness
+              purposes. It does not provide medical or
+              nutritional advice.
             </p>
           </div>
 

@@ -1939,3 +1939,49 @@ a {
     flex: 1;
   }
 }
+
+/* ================================
+   PLAN GENERATION STATUS
+================================ */
+
+.generation-success,
+.generation-fallback {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  margin-bottom: 18px;
+  padding: 13px 15px;
+
+  border-radius: 11px;
+}
+
+.generation-success {
+  border: 1px solid #cce6d5;
+  background: #f1faf4;
+  color: #277545;
+}
+
+.generation-fallback {
+  border: 1px solid #dce4ed;
+  background: #f6f8fb;
+  color: #58667a;
+}
+
+.generation-success > div,
+.generation-fallback > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.generation-success strong,
+.generation-fallback strong {
+  font-size: 13px;
+}
+
+.generation-success span,
+.generation-fallback span {
+  font-size: 12px;
+  line-height: 1.5;
+}
