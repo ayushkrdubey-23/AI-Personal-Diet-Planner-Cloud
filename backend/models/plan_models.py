@@ -10,9 +10,9 @@ class Meal(BaseModel):
 
 
 class PlanRequest(BaseModel):
-    user_id: str = Field(
-        min_length=1,
-        description="Authenticated user's identifier"
+    user_id: str | None = Field(
+        default=None,
+        description="Ignored by the backend; trusted UID comes from Firebase token"
     )
 
     name: Optional[str] = ""

@@ -1,12 +1,17 @@
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+import { auth } from "../firebase";
 
-// Convert backend response into the format
-// already used by our React components.
+const API_BASE_URL =
+  "http://127.0.0.1:8000/api";
+
+
 const normalizePlanResponse = (data) => {
   return {
-    id: data.plan_id || `backend-${Date.now()}`,
+    id:
+      data.plan_id ||
+      `backend-${Date.now()}`,
 
-    createdAt: new Date().toISOString(),
+    createdAt:
+      new Date().toISOString(),
 
     profile: {
       dietaryPreference:
@@ -44,15 +49,31 @@ const normalizePlanResponse = (data) => {
   };
 };
 
-// Generate a plan through FastAPI
+
 export const generatePlanFromAPI = async (
   profile,
   userId
 ) => {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    throw new Error(
+      "User is not authenticated."
+    );
+  }
+
+  // Firebase creates/refreshes the ID token
+  // for the currently signed-in user.
+  const idToken =
+    await currentUser.getIdToken();
+
   const requestBody = {
+    // Kept only for compatibility with the
+    // request model. Backend ignores it.
     user_id: userId,
 
-    name: profile?.name || "",
+    name:
+      profile?.name || "",
 
     activity:
       profile?.activity ||
@@ -80,6 +101,9 @@ export const generatePlanFromAPI = async (
 
       headers: {
         "Content-Type": "application/json",
+
+        Authorization:
+          `Bearer ${idToken}`,
       },
 
       body: JSON.stringify(requestBody),
@@ -87,12 +111,28 @@ export const generatePlanFromAPI = async (
   );
 
   if (!response.ok) {
-    throw new Error(
-      `Backend request failed with status ${response.status}`
-    );
+    let errorMessage =
+      `Backend request failed with status ${response.status}`;
+
+    try {
+      const errorData =
+        await response.json();
+
+      if (errorData.detail) {
+        errorMessage =
+          errorData.detail;
+      }
+    } catch {
+      // Keep the default message
+    }
+
+    throw new Error(errorMessage);
   }
 
-  const data = await response.json();
+  const data =
+    await response.json();
 
-  return normalizePlanResponse(data);
+  return normalizePlanResponse(
+    data
+  );
 };
