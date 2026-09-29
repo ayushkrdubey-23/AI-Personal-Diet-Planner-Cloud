@@ -14,6 +14,7 @@ import SavedPlans from "./pages/SavedPlans";
 import CloudFiles from "./pages/CloudFiles";
 import PlanResult from "./pages/PlanResult";
 import DailyTracker from "./pages/DailyTracker";
+import Landing from "./pages/Landing";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -22,12 +23,13 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes */}
+        {/* Public Landing Page */}
         <Route
           path="/"
-          element={<Navigate to="/login" replace />}
+          element={<Landing />}
         />
 
+        {/* Public Authentication Pages */}
         <Route
           path="/register"
           element={<Register />}
@@ -38,7 +40,7 @@ function App() {
           element={<Login />}
         />
 
-        {/* Protected application */}
+        {/* Protected Application */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route
@@ -67,8 +69,8 @@ function App() {
             />
 
             <Route
-                path="/daily-tracker"
-                element={<DailyTracker />}
+              path="/daily-tracker"
+              element={<DailyTracker />}
             />
 
             <Route
@@ -81,7 +83,7 @@ function App() {
         {/* Fallback */}
         <Route
           path="*"
-          element={<Navigate to="/login" replace />}
+          element={<Navigate to="/" replace />}
         />
       </Routes>
     </BrowserRouter>
